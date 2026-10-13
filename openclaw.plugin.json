@@ -28,15 +28,31 @@
       },
       "provider": {
         "type": "string",
-        "description": "Override provider for security check LLM (optional)"
+        "description": "Provider id to compose with model for x-openclaw-model override (optional)"
       },
       "model": {
         "type": "string",
-        "description": "Override model for security check LLM (optional)"
+        "description": "Judge model: openclaw agent ref, full provider/model, or short id with provider (optional)"
+      },
+      "agentId": {
+        "type": "string",
+        "description": "Gateway agent id for body model openclaw/<id> (optional, default main)"
       },
       "authProfileId": {
         "type": "string",
-        "description": "Auth profile ID for security check LLM (optional)"
+        "description": "Reserved; not used in v1 (gateway owns provider credentials)"
+      },
+      "temperature": {
+        "type": "number",
+        "description": "Optional temperature forwarded to gateway chat completions"
+      },
+      "top_p": {
+        "type": "number",
+        "description": "Optional top_p forwarded to gateway chat completions"
+      },
+      "max_tokens": {
+        "type": "number",
+        "description": "Optional max_tokens forwarded to gateway chat completions"
       },
       "timeoutMs": {
         "type": "number",
@@ -45,6 +61,22 @@
       "maxContextWords": {
         "type": "number",
         "description": "Maximum words of session context to include for the judge (default: 2000)"
+      },
+      "gatewayHost": {
+        "type": "string",
+        "description": "Gateway host for LLM calls (default: 127.0.0.1)"
+      },
+      "gatewayPort": {
+        "type": "number",
+        "description": "Gateway port for LLM calls (default: 18789)"
+      },
+      "metricsEnabled": {
+        "type": "boolean",
+        "description": "Enable anonymous metrics collection (default: true)"
+      },
+      "metricsClientId": {
+        "type": "string",
+        "description": "Metrics client ID (optional, uses default if not provided)"
       }
     }
   },
@@ -72,19 +104,39 @@
     },
     "provider": {
       "label": "LLM Provider",
-      "help": "Override provider for security check (e.g., anthropic, openai)",
+      "help": "Provider id composed with model for x-openclaw-model (e.g. openrouter)",
       "advanced": true
     },
     "model": {
       "label": "LLM Model",
-      "help": "Override model for security check",
+      "help": "Judge model: openclaw agent ref or provider/model backend override",
+      "advanced": true
+    },
+    "agentId": {
+      "label": "Agent ID",
+      "help": "Gateway agent surface for the judge call (default: main)",
       "advanced": true
     },
     "authProfileId": {
       "label": "Auth Profile",
-      "help": "Auth profile ID for the security check LLM",
+      "help": "Reserved; not used in v1 — gateway owns provider credentials",
       "advanced": true,
       "sensitive": true
+    },
+    "temperature": {
+      "label": "Temperature",
+      "help": "Optional sampling temperature for the judge call",
+      "advanced": true
+    },
+    "top_p": {
+      "label": "Top P",
+      "help": "Optional top_p for the judge call",
+      "advanced": true
+    },
+    "max_tokens": {
+      "label": "Max Tokens",
+      "help": "Optional max_tokens for the judge call",
+      "advanced": true
     },
     "timeoutMs": {
       "label": "Timeout (ms)",
@@ -94,6 +146,25 @@
     "maxContextWords": {
       "label": "Max Context Words",
       "help": "Maximum words of session context to include for the judge LLM (limits token usage)",
+      "advanced": true
+    },
+    "gatewayHost": {
+      "label": "Gateway Host",
+      "help": "OpenClaw gateway host for /v1/chat/completions",
+      "advanced": true
+    },
+    "gatewayPort": {
+      "label": "Gateway Port",
+      "help": "OpenClaw gateway port",
+      "advanced": true
+    },
+    "metricsEnabled": {
+      "label": "Metrics",
+      "help": "Anonymous usage metrics (PostHog)"
+    },
+    "metricsClientId": {
+      "label": "Metrics Client ID",
+      "help": "Optional PostHog client id",
       "advanced": true
     }
   }

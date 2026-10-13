@@ -26,28 +26,45 @@ openclaw plugins install @capsulesecurity/clawguard
 | `securityCheckEnabled` | boolean | `true` | Enable LLM as a Judge for security evaluation |
 | `securityPrompt` | string | (built-in) | Custom prompt for the judge LLM |
 | `blockOnRisk` | boolean | `true` | Block tool calls judged as high/critical risk |
+| `model` | string | (unset) | Judge model: `openclaw:…` agent ref, or `provider/model` backend override via `x-openclaw-model` |
+| `provider` | string | (unset) | Optional provider id composed with short/`vendor/model` `model` |
+| `agentId` | string | (unset) | Gateway agent surface → body `openclaw/<agentId>` (else `openclaw:main`) |
+| `temperature` | number | (unset) | Optional sampling forwarded to gateway |
+| `top_p` | number | (unset) | Optional sampling forwarded to gateway |
+| `max_tokens` | number | (unset) | Optional token cap forwarded to gateway |
 | `timeoutMs` | number | `15000` | Timeout for judge evaluation in milliseconds |
 | `maxContextWords` | number | `2000` | Maximum words of session context to include |
 | `gatewayHost` | string | `127.0.0.1` | Gateway host for LLM calls |
 | `gatewayPort` | number | `18789` | Gateway port for LLM calls |
 | `metricsEnabled` | boolean | `true` | Enable anonymous usage metrics |
 | `metricsClientId` | string | (built-in) | PostHog client ID for metrics |
+| `authProfileId` | string | (unset) | Reserved / no-op in v1 (gateway owns provider credentials) |
 
 ### Example Configuration
 
 ```json
 {
   "plugins": {
-    "capsule-claw-guard": {
-      "enabled": true,
-      "logToolCalls": true,
-      "securityCheckEnabled": true,
-      "blockOnRisk": true,
-      "timeoutMs": 20000
+    "entries": {
+      "capsule-claw-guard": {
+        "enabled": true,
+        "config": {
+          "logToolCalls": true,
+          "securityCheckEnabled": true,
+          "blockOnRisk": true,
+          "timeoutMs": 20000,
+          "model": "openrouter/nvidia/nemotron-3.5-content-safety:free",
+          "temperature": 0.01,
+          "top_p": 0.95,
+          "max_tokens": 500
+        }
+      }
     }
   }
 }
 ```
+
+Judge calls still go through the OpenClaw Gateway (`/v1/chat/completions`). The plugin does **not** take a provider API key: OpenClaw resolves credentials for the selected backend model. Incomplete `provider`/`model` pairs fail closed (security check skipped with an error log).
 
 ## Security Risks Evaluated
 
@@ -96,7 +113,7 @@ The plugin makes HTTP calls to the OpenClaw Gateway's `/v1/chat/completions` end
 1. The plugin hooks into `before_tool_call` events
 2. Logs the full tool call JSON (if logging enabled)
 3. Loads the session context from session files (limited by `maxContextWords`)
-4. Sends both the tool call and session context to the judge LLM for security evaluation
+4. Sends both the tool call and session context to the judge LLM via Gateway `/v1/chat/completions` (`model: openclaw:…`, optional `x-openclaw-model` backend override)
 5. The judge returns a verdict with risk level and reasoning
 6. If judged as high/critical risk and blocking is enabled, the tool call is blocked
 7. All verdicts are logged for audit purposes

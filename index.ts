@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { createMetricsProvider, type MetricsProvider } from "./metrics/index.js";
+import { resolveJudgeRequest, type JudgeRequest } from "./resolve-judge.js";
 
 // =============================================================================
 // Types
@@ -20,6 +21,22 @@ type ClawGuardConfig = {
   gatewayPort?: number;
   metricsEnabled?: boolean;
   metricsClientId?: string;
+  /** Optional provider id when composing backend override with `model`. */
+  provider?: string;
+  /**
+   * Judge model selector:
+   * - `openclaw:…` / `openclaw/…` → gateway agent body model
+   * - `provider/model` → `x-openclaw-model` backend override
+   * - short id with `provider` → composed backend override
+   */
+  model?: string;
+  /** Optional agent id for body model `openclaw/<agentId>` (default main). */
+  agentId?: string;
+  /** Reserved; not wired in v1 (gateway owns provider credentials). */
+  authProfileId?: string;
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
 };
 
 type SecurityCheckResult = {
@@ -136,6 +153,7 @@ async function callGatewayChat(
   authToken: string | null,
   prompt: string,
   timeoutMs: number,
+  judge: JudgeRequest,
 ): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -147,15 +165,29 @@ async function callGatewayChat(
     if (authToken) {
       headers["Authorization"] = `Bearer ${authToken}`;
     }
+    if (judge.backendModel) {
+      headers["x-openclaw-model"] = judge.backendModel;
+    }
+
+    const body: Record<string, unknown> = {
+      model: judge.agentModel,
+      messages: [{ role: "user", content: prompt }],
+      stream: false,
+    };
+    if (judge.temperature !== undefined) {
+      body.temperature = judge.temperature;
+    }
+    if (judge.top_p !== undefined) {
+      body.top_p = judge.top_p;
+    }
+    if (judge.max_tokens !== undefined) {
+      body.max_tokens = judge.max_tokens;
+    }
 
     const response = await fetch(`${gatewayUrl}/v1/chat/completions`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model: "openclaw:main",
-        messages: [{ role: "user", content: prompt }],
-        stream: false,
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
 
@@ -407,10 +439,20 @@ async function runSecurityCheck(
   const gatewayUrl = resolveGatewayUrl(config, api.config as Record<string, unknown>);
   const authToken = resolveGatewayAuthToken();
 
+  let judge: JudgeRequest;
   try {
-    log.debug(`Running security check via gateway at ${gatewayUrl}`);
+    judge = resolveJudgeRequest(config);
+  } catch (err) {
+    log.error(`Invalid judge model config: ${String(err)}`);
+    return null;
+  }
 
-    const text = await callGatewayChat(gatewayUrl, authToken, fullPrompt, timeoutMs);
+  try {
+    log.debug(
+      `Running security check via gateway at ${gatewayUrl} agent=${judge.agentModel} backend=${judge.backendModel ?? "default"}`,
+    );
+
+    const text = await callGatewayChat(gatewayUrl, authToken, fullPrompt, timeoutMs, judge);
 
     if (!text) {
       log.warn("Security check LLM returned empty output");
@@ -556,6 +598,35 @@ const clawGuardPlugin = {
           type: "boolean",
           description: "Block tool calls when security risk is detected (default: true)",
         },
+        provider: {
+          type: "string",
+          description: "Provider id to compose with model for x-openclaw-model override (optional)",
+        },
+        model: {
+          type: "string",
+          description:
+            "Judge model: openclaw agent ref, full provider/model, or short id with provider (optional)",
+        },
+        agentId: {
+          type: "string",
+          description: "Gateway agent id for body model openclaw/<id> (optional, default main)",
+        },
+        authProfileId: {
+          type: "string",
+          description: "Reserved; not used in v1 (gateway owns provider credentials)",
+        },
+        temperature: {
+          type: "number",
+          description: "Optional temperature forwarded to gateway chat completions",
+        },
+        top_p: {
+          type: "number",
+          description: "Optional top_p forwarded to gateway chat completions",
+        },
+        max_tokens: {
+          type: "number",
+          description: "Optional max_tokens forwarded to gateway chat completions",
+        },
         maxContextWords: {
           type: "number",
           description: "Maximum words of session context to include (default: 2000)",
@@ -611,6 +682,14 @@ const clawGuardPlugin = {
       clientId: config.metricsClientId ?? "",
     });
 
+    let judgeSummary = "agent=openclaw:main backend=default";
+    try {
+      const judge = resolveJudgeRequest(config);
+      judgeSummary = `agent=${judge.agentModel} backend=${judge.backendModel ?? "default"}`;
+    } catch (err) {
+      log.error(`Invalid judge model config at register: ${String(err)}`);
+    }
+
     // Register hook
     api.on("before_tool_call", async (event, ctx) => {
       return handleToolCall(event, ctx, api, config, options, log, metrics);
@@ -619,7 +698,7 @@ const clawGuardPlugin = {
     // Log initialization
     const metricsStatus = metrics ? "enabled" : "disabled";
     log.info(
-      `Initialized (logging: ${options.logToolCalls}, security: ${options.securityCheckEnabled}, block: ${options.blockOnRisk}, metrics: ${metricsStatus})`,
+      `Initialized (logging: ${options.logToolCalls}, security: ${options.securityCheckEnabled}, block: ${options.blockOnRisk}, metrics: ${metricsStatus}, ${judgeSummary})`,
     );
   },
 };
