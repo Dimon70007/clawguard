@@ -1,10 +1,12 @@
 {
   "name": "@capsulesecurity/clawguard",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Security guard plugin for OpenClaw - uses LLM as a Judge to detect and block risky tool calls",
   "type": "module",
-  "main": "index.ts",
+  "main": "./dist/index.js",
   "scripts": {
+    "build": "esbuild index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --packages=external",
+    "postinstall": "npm run build",
     "test": "node --test --experimental-strip-types resolve-judge.test.ts"
   },
   "keywords": [
@@ -24,6 +26,9 @@
   "bugs": {
     "url": "https://github.com/Dimon70007/clawguard/issues"
   },
+  "dependencies": {
+    "esbuild": "^0.25.0"
+  },
   "peerDependencies": {
     "openclaw": ">=2026.2.0"
   },
@@ -34,7 +39,17 @@
   },
   "openclaw": {
     "extensions": [
-      "./index.ts"
+      "./dist/index.js"
     ]
-  }
+  },
+  "files": [
+    "dist",
+    "index.ts",
+    "resolve-judge.ts",
+    "metrics",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE",
+    "clawguard.png"
+  ]
 }

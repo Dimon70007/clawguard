@@ -14,7 +14,11 @@ A security guard plugin for OpenClaw that monitors and validates tool calls befo
 ## Installation
 
 ```bash
+# npm / ClawHub
 openclaw plugins install @capsulesecurity/clawguard
+
+# this fork (compiled JS is produced by postinstall → esbuild → dist/index.js)
+openclaw plugins install --force git:github.com/Dimon70007/clawguard@feat/judge-model-gateway-override
 ```
 
 ## Configuration
