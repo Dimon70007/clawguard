@@ -3,4 +3,7 @@
 
 # Claude Code instructions (local only)
 CLAUDE.md
-dist/
+
+# Build / install
+node_modules/
+package-lock.json
