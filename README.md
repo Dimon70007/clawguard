@@ -13,12 +13,70 @@ A security guard plugin for OpenClaw that monitors and validates tool calls befo
 
 ## Installation
 
+### Path-load into workspace `skills/` (recommended)
+
+Load from the agent workspace `skills/` directory via `plugins.load.paths`
+(not managed `~/.openclaw/git` / `extensions`). Use placeholders only — no
+host account paths or secrets in commands.
+
 ```bash
-# npm / ClawHub
+WORKSPACE="${OPENCLAW_WORKSPACE:-$HOME/workspace}"
+SKILLS="$WORKSPACE/skills"
+mkdir -p "$SKILLS"
+
+# drop a conflicting managed install if present
+openclaw plugins uninstall clawguard 2>/dev/null || true
+
+git clone --branch feat/judge-model-gateway-override --single-branch \
+  git@github.com:Dimon70007/clawguard.git \
+  "$SKILLS/clawguard"
+
+cd "$SKILLS/clawguard"
+npm install
+# compiled JS: postinstall / build → dist/index.js (if present in package.json)
+npm run build 2>/dev/null || true
+
+# optional: record path install without copying into managed roots
+openclaw plugins install -l "$SKILLS/clawguard"
+```
+
+In OpenClaw config:
+
+```json
+{
+  "plugins": {
+    "load": { "paths": ["<workspace>/skills"] },
+    "allow": ["clawguard"],
+    "entries": {
+      "clawguard": {
+        "enabled": true,
+        "config": {
+          "logToolCalls": true,
+          "securityCheckEnabled": true,
+          "blockOnRisk": true,
+          "timeoutMs": 20000,
+          "model": "openrouter/nvidia/nemotron-3.5-content-safety:free",
+          "temperature": 0.01,
+          "top_p": 0.95,
+          "max_tokens": 500
+        }
+      }
+    }
+  }
+}
+```
+
+Then `openclaw gateway restart` and `openclaw plugins info clawguard`.
+
+### Alternatives
+
+```bash
+# npm / ClawHub (upstream package id may differ)
 openclaw plugins install @capsulesecurity/clawguard
 
-# this fork (compiled JS is produced by postinstall → esbuild → dist/index.js)
-openclaw plugins install --force git:github.com/Dimon70007/clawguard@feat/judge-model-gateway-override
+# managed git install (OpenClaw default roots — not skills/)
+openclaw plugins install --force \
+  git:github.com/Dimon70007/clawguard@feat/judge-model-gateway-override
 ```
 
 ## Configuration
