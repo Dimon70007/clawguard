@@ -49,8 +49,9 @@ openclaw plugins install --force git:github.com/Dimon70007/clawguard@feat/judge-
 ```json
 {
   "plugins": {
+    "allow": ["clawguard"],
     "entries": {
-      "capsule-claw-guard": {
+      "clawguard": {
         "enabled": true,
         "config": {
           "logToolCalls": true,
